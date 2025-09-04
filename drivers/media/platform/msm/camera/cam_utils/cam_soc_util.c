@@ -1128,7 +1128,7 @@ static int cam_soc_util_get_dt_regulator_info
 	return rc;
 }
 
-/* ---JT---, add to parsing asic uart line number to control */
+/* add to parsing asic uart line number to control */
 static int asic_uart_line(struct device_node *of_node)
 {
 	struct device_node *src_node = NULL;
@@ -1164,7 +1164,7 @@ int cam_soc_util_get_dt_properties(struct cam_hw_soc_info *soc_info)
 			soc_info->dev_name);
 		return rc;
 	}
-	/*---JT---, fill asic_supported check*/
+	/* fill asic_supported check*/
 	rc = of_property_read_u32(of_node, "asic_supported", &soc_info->asic_supported);
 	if (rc < 0) {
 		soc_info->asic_supported = 0;

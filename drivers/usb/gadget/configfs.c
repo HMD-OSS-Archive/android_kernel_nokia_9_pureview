@@ -223,37 +223,7 @@ GI_DEVICE_DESC_SIMPLE_RW(bDeviceSubClass, u8);
 GI_DEVICE_DESC_SIMPLE_RW(bDeviceProtocol, u8);
 GI_DEVICE_DESC_SIMPLE_RW(bMaxPacketSize0, u8);
 GI_DEVICE_DESC_SIMPLE_RW(idVendor, u16);
-/* Porting fih scsi command */
-#if defined CONFIG_FIH_USB && CONFIG_FIH_USB
-GI_DEVICE_DESC_SIMPLE_R_u16(idProduct);
-
-int fihPid = 0x0000;
-
-//No difference to other GI_DEVICE_DESC_SIMPLE_RW functions,
-//make it independent is just for storing current pid for fih_usb
-static ssize_t gadget_dev_desc_idProduct_store(struct config_item *item,
-		const char *page, size_t len)
-{
-	u16 val;
-	int ret;
-	ret = kstrtou16(page, 0, &val);
-	if (ret)
-		return ret;
-	to_gadget_info(item)->cdev.desc.idProduct = cpu_to_le16p(&val);
-	fihPid = cpu_to_le16p(&val); //Store current pid
-	return len;
-}
-
-//fih_usb uses this to get current pid
-int android_usb_product_id(void)
-{
-	return fihPid;
-}
-EXPORT_SYMBOL(android_usb_product_id);
-#else
 GI_DEVICE_DESC_SIMPLE_RW(idProduct, u16);
-#endif
-/* Porting end */
 GI_DEVICE_DESC_SIMPLE_R_u16(bcdDevice);
 
 static ssize_t is_valid_bcd(u16 bcd_val)
@@ -1444,9 +1414,6 @@ static int configfs_composite_bind(struct usb_gadget *gadget,
 err_purge_funcs:
 	purge_configs_funcs(gi);
 err_comp_cleanup:
-	/* FIH - BBS log */
-	printk("BBox::UEC;3::2\n");
-	/* end FIH*/
 	composite_dev_cleanup(cdev);
 	return ret;
 }
@@ -1669,23 +1636,8 @@ out:
 
 static DEVICE_ATTR(state, S_IRUGO, state_show, NULL);
 
-/* Poring FIH scsi root command */
-#if defined CONFIG_FIH_USB && CONFIG_FIH_USB
-static ssize_t root_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	extern bool scsi_adb_root_flag(void);
-	return sprintf(buf, "%d\n", scsi_adb_root_flag()?1:0);
-}
-
-static DEVICE_ATTR(root, S_IRUGO, root_show, NULL);
-#endif
-/* end Poring FIH scsi root command */
-
 static struct device_attribute *android_usb_attributes[] = {
 	&dev_attr_state,
-#if defined CONFIG_FIH_USB && CONFIG_FIH_USB
-	&dev_attr_root,  //Poring FIH scsi root comman
-#endif
 	NULL
 };
 

@@ -16,19 +16,6 @@ config FIH_AOP
 	help
 	  support fih_aop
 
-config FIH_PM2
-	bool "fih_pm2"
-	default n
-	help
-	  support fih_pm2
-
-config FIH_APR
-	bool "fih apr"
-	depends on FIH
-	default n
-	help
-	  support fih apr virtual file
-
 config FIH_INFO
 	bool "fih info"
 	depends on FIH
@@ -36,47 +23,12 @@ config FIH_INFO
 	help
 	  support fih info virtual file
 
-config FIH_GPIO
-	bool "fih gpio"
-	depends on FIH
-	default n
-	help
-	  support fih gpio function
-
-config FIH_DDR
-	bool "fih ddr"
-	depends on FIH
-	default n
-	help
-	  support fih ddr virtual file
-
-config FIH_MFD
-	bool "fih mfd"
-	depends on FIH
-	default n
-	help
-	  support fih mfd virtual file
-
 config FIH_NV
 	bool "fih nv"
 	depends on FIH
 	default n
 	help
 	  support fih nv function
-
-config FIH_SUT
-	bool "fih sut"
-	depends on FIH
-	default n
-	help
-	  support fih sut virtual file
-
-config FIH_FVER
-	bool "fih fver"
-	depends on FIH
-	default n
-	help
-	  support fih fver virtual file
 
 config FIH_UFS
 	bool "fih ufs"
@@ -92,87 +44,12 @@ config FIH_TOUCH
 	help
 	  support fih touch virtual file
 
-config FIH_LOG
-	bool "fih log"
-	depends on FIH
-	default n
-	help
-	  support fih log virtual file
-
-config FIH_CDA
-	bool "fih cda"
-	depends on FIH
-	default n
-	help
-	  support fih cda virtual file
-
-config FIH_SEB
-	bool "fih seb"
-	depends on FIH
-	default n
-	help
-	  support fih seb virtual file
-
 config FIH_MFR
 	bool "fih mfr"
 	depends on FIH
 	default y
 	help
 	  support fih mfr virtual file
-
-config FIH_SAMP
-	bool "fih samp"
-	depends on FIH
-	default n
-	help
-	  support fih samp virtual file
-
-config FIH_SENSOR
-	bool "fih sensor"
-	depends on FIH
-	default n
-	help
-	  support fih sensor virtual file
-
-config FIH_USB
-	bool "fih usb"
-	default n
-	help
-	  support FIH USB Driver
-
-config FIH_HAC
-	bool "fih hac"
-	default n
-	help
-	  support fih hac virtual file
-
-config FIH_HALL_SENSOR
-	bool "fih hall sensor"
-	depends on FIH
-	default n
-	help
-	  support fih hall sensor driver
-
-config FIH_CPU
-	bool "fih cpu"
-	depends on FIH
-	default n
-	help
-	  support fih cpu virtual file
-
-config FIH_GYRO
-	bool "fih gyro"
-	depends on FIH
-	default n
-	help
-	  support fih gyro virtual file
-
-config FIH_ALSP
-	bool "fih alsp"
-	depends on FIH
-	default n
-	help
-	  support fih alsp virtual file
 
 config FIH_BATTERY
 	bool "fih battery"

@@ -1,8 +1,6 @@
 /*
  * Wireless charger driver for IDT P9221
  *
- * Copyright (C) 2018 FIH Foxconn. All rights reserved.
- *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
  * only version 2 as published by the Free Software Foundation.
@@ -1288,6 +1286,5 @@ static struct i2c_driver p9221_driver = {
 };
 module_i2c_driver(p9221_driver);
 
-MODULE_AUTHOR("Jimmy Hu <JimmyCYHu@fih-foxconn.com>");
 MODULE_DESCRIPTION("Driver for IDT P9221 Wireless Charger");
 MODULE_LICENSE("GPL v2");

@@ -1,14 +1,10 @@
 /*
  * Driver for ts3a5018 switch chip.
  *
- * Copyright (C) 2017 FIH co.
- *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  *
- * Author:  PinyCHWu <pinychwu@fih-foxconn.com>
- *	    Nov. 2017
  */
 #define pr_fmt(fmt) "%s: " fmt, __func__
 
@@ -390,5 +386,4 @@ module_init(ts3a5018_init);
 module_exit(ts3a5018_exit);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("PinyCHWu <pinychwu@fih-foxconn.com>");
 MODULE_DESCRIPTION("TI ts3a5018 analog switch driver");

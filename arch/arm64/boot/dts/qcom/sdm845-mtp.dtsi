@@ -312,7 +312,7 @@
 };
 
 &qupv3_se3_i2c {
-/* FIH modified and remove to project NFC dtsi */
+/* modified and remove to project NFC dtsi */
 	status = "ok";
 /*
 	nq@28 {

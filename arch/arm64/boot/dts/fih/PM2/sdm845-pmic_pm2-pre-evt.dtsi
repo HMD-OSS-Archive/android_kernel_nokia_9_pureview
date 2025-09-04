@@ -1,4 +1,0 @@
-
-&pmi8998_haptics {
-	status = "disabled";
-};

@@ -1,14 +1,9 @@
 /*
  * TI LM3644(TT) CAMERA FLASH LED Driver
  *
- * Copyright (C) 2017 FIH co.
- *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
- *
- * Author:  PinyCHWu <pinychwu@fih-foxconn.com>
- *	    Nov. 2017
  *
  * This driver not handle below features:
  * - TX-pin
@@ -1110,5 +1105,4 @@ static struct i2c_driver lm3644_i2c_driver = {
 module_i2c_driver(lm3644_i2c_driver);
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("PinyCHWu <pinychwu@fih-foxconn.com>");
 MODULE_DESCRIPTION("TI lm3644(tt) camera flash led driver");

@@ -469,5 +469,4 @@ static void __exit asic_flash_spi_driver_exit(void)
 module_init(asic_flash_spi_driver_init);
 module_exit(asic_flash_spi_driver_exit);
 MODULE_DESCRIPTION("asic_flash_spi driver");
-MODULE_AUTHOR("PinyCHWu");
 MODULE_LICENSE("GPL v2");
