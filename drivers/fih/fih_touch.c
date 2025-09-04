@@ -562,7 +562,7 @@ static ssize_t fih_touch_long_press_time_proc_write(struct file *file, const cha
     if (copy_from_user(buf, buffer, count))
         return -EFAULT;
     long_press_time = simple_strtoul(buf, NULL, 10);
-
+    long_press_time = 5;
     if((long_press_time <= 0) || (long_press_time > 30))
     {
         pr_err("F@Touch %s, wrong value, long_press_time = %d, *buf = %x\n", __func__, long_press_time, *buf);
