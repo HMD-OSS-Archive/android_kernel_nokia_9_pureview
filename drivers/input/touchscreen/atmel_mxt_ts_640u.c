@@ -35,6 +35,9 @@
 #include <linux/workqueue.h>
 #include <linux/wakelock.h>
 #include <linux/uaccess.h>
+#include <linux/time.h>
+#include <linux/rtc.h>
+#include <linux/timekeeping.h>
 
 
 #include "../../fih/fih_touch.h"
@@ -82,6 +85,7 @@
 #define MXT_OBJ_NOISE_T72		72
 #define MXT_OBJ_RETRANSMISSION		80
 #define MXT_UNLOCK_GESTURE_T81		81
+#define MXT_MOISTURE_SUPPRESSION_T136		136
 #define MXT_PROCI_SYMBOLGESTUREPROCESSOR	92
 #define MXT_PROCI_TOUCHSEQUENCELOGGER	93
 #define MXT_TOUCH_MULTITOUCHSCREEN_T100 100
@@ -248,11 +252,14 @@ enum t100_type {
 #define MXT_T80_COMPTHR_OFFSET 1
 
 #define MXT_T81_ENABLE_OFFSET 0
+#define MXT_T81_GOOD_AREA_OFFSET 7
 #define MXT_T81_CTRL_ENABLE  (1 << 0)
 #define MXT_T81_CTRL_RPTEN   (1 << 1)
 #define MXT_T81_CTRL_PRESSREQ   (1 << 2)
 
 #define MXT_T81_TOUCH_TIME 17
+
+#define MXT_T136_ENABLE_OFFSET 1
 
 #define MXT_T8_ENABLE 1
 #define MXT_T8_DISABLE 2
@@ -278,6 +285,22 @@ enum t100_type {
 
 //To define touch driver need to  re-register input device after config/firmware update
 #define RE_REGISTER_INPUT_DEVICE
+
+#define LONG_PRESSE_TOUCH_COUNT 1
+#define NODE_NUMBER_MIN_GOOD_1 1//2
+#define NODE_NUMBER_MIN_GOOD_2 1//3
+#define NODE_NUMBER_MIN_GOOD_3 1//4
+#define NODE_NUMBER_MIN_PARTIAL 1//5
+#define PV_MIN_GOOD_2 0//50
+#define PV_MIN_GOOD_3 0//70
+#define PV_MIN_PARTIAL 0//100
+
+enum long_press_type {
+	TYPE_AREA_GOOD_1	= 1,
+	TYPE_AREA_GOOD_2	= 2,
+	TYPE_AREA_GOOD_3	= 3,
+	TYPE_AREA_PARTIAL	= 4,
+};
 
 enum test_results {
 	TEST_PASS = 0,
@@ -420,6 +443,7 @@ struct mxt_data {
 	u16 T80_address;//Retransmission Compensation
 	u8 T81_reportid; //Unlocker
 	u16 T81_address;
+	u16 T136_address;
 	u16 T92_address;
 	u8 T92_reportid;
 	u16 T93_address;
@@ -467,8 +491,18 @@ u8 touch_debug_test = 0;
 u16 long_press_area_x[2] = {545, 895}; //UD_FP_x, C Area
 u16 long_press_area_y[2] = {1740, 2100}; //UD_FP_y, C Area
 
-u16 long_press_area_x_good[2] = {620, 800}; //UD_FP_x, D Area
-u16 long_press_area_y_good[2] = {1830, 2010}; //UD_FP_y, D Area
+u16 long_press_area_x_good_1[2] = {697, 733};
+u16 long_press_area_y_good_1[2] = {1915, 1950};
+u16 long_press_area_x_good_2[2] = {661, 769};
+u16 long_press_area_y_good_2[2] = {1880, 1985};
+u16 long_press_area_x_good_3[2] = {625, 805}; //UD_FP_x, D Area
+u16 long_press_area_y_good_3[2] = {1845, 2020}; //UD_FP_y, D Area
+u8 T81_good_area[4] = {0xA4, 0x6F, 0x0F, 0x20}; //X: 625 ~ 805, Y: 1845 ~ 2020 (180px x 175px)
+u16 x_value[LONG_PRESSE_TOUCH_COUNT] = {0};
+u16 y_value[LONG_PRESSE_TOUCH_COUNT] = {0};
+u16 node_value[LONG_PRESSE_TOUCH_COUNT] = {0};
+u16 pv_value[LONG_PRESSE_TOUCH_COUNT] = {0};
+u16 long_press_count = 0;
 
 //touch file node+[
 extern struct fih_touch_cb touch_cb;
@@ -588,6 +622,7 @@ static bool mxt_object_readable(unsigned int type)
 	case MXT_SPT_DYNAMICCONFIGURATIONCONTAINER_T71:
 	case MXT_OBJ_NOISE_T72:
 	case MXT_UNLOCK_GESTURE_T81:
+	case MXT_MOISTURE_SUPPRESSION_T136:
 		return true;
 	default:
 		return false;
@@ -1273,6 +1308,65 @@ static void mxt_proc_t9_message(struct mxt_data *data, u8 *message)
 	data->update_input = true;
 }
 
+int long_press_trigger_save_file(u16 x, u16 y, u8 major, u8 pressure, int avg_flage)
+{
+	struct file *pfile = NULL;
+	char filepath[128];
+	loff_t pos;
+	mm_segment_t old_fs;
+	struct timeval time;
+	struct rtc_time tm;
+	unsigned long local_time;
+	char data_buf[256] = {0};
+
+	do_gettimeofday(&time);
+	local_time = (u32)(time.tv_sec - (sys_tz.tz_minuteswest * 60));
+	rtc_time_to_tm(local_time, &tm);
+
+	if(avg_flage == 0) { // Raw data
+		snprintf(data_buf, sizeof(data_buf),
+				"[%04d%02d%02d%02d%02d%02d] , [RAW] , X:%04d , Y:%04d , NODE:%02d , P:%03d \n",
+				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, x, y, major, pressure);
+	} else if(avg_flage == 1) { // Good avg data
+		snprintf(data_buf, sizeof(data_buf),
+				"[%04d%02d%02d%02d%02d%02d] , [GOOD] , X:%04d , Y:%04d , NODE:%02d , P:%03d \n",
+				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, x, y, major, pressure);
+	} else if(avg_flage == 2) { // Partial avg data
+		snprintf(data_buf, sizeof(data_buf),
+				"[%04d%02d%02d%02d%02d%02d] , [PARTIAL] , X:%04d , Y:%04d , NODE:%02d , P:%03d \n",
+				tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, x, y, major, pressure);
+	}
+
+	dev_info(&g_data->client->dev, "%s", data_buf);
+
+	if(g_data == NULL) {
+		printk("%s, g_data = NULL\n", __func__);
+		return -1;
+	}
+
+	dev_info(&g_data->client->dev, "%s \n", __func__);
+	memset(filepath, 0, sizeof(filepath));
+	sprintf(filepath, "%s%s", "/data/vendor/misc/touch/", "long_press_trigger_result.log");
+
+	if (NULL == pfile) {
+		pfile = filp_open(filepath, O_CREAT | O_RDWR | O_APPEND, 0644);
+	}
+	if (IS_ERR(pfile)) {
+		dev_err(&g_data->client->dev, "error occured while opening file %s. \n", filepath);
+		return -EIO;
+	}
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	pos = pfile->f_pos;
+	vfs_write(pfile, data_buf, strlen(data_buf), &pos);
+	pfile->f_pos = pos;
+	filp_close(pfile, NULL);
+	set_fs(old_fs);
+
+	return 0;
+}
+
 static void mxt_proc_t100_message(struct mxt_data *data, u8 *message)
 {
 	struct device *dev = &data->client->dev;
@@ -1289,6 +1383,11 @@ static void mxt_proc_t100_message(struct mxt_data *data, u8 *message)
 	u8 orientation = 0;
 	bool active = false;
 	bool hover = false;
+
+	int i, long_press_type = 0;
+	bool ignore = false;
+	u16 x_total = 0, y_total = 0, node_total = 0, pv_total = 0;
+	u16 x_avg = 0, y_avg = 0, node_avg = 0, pv_avg = 0;
 
 	id = message[0] - data->T100_reportid_min - 2;
 
@@ -1391,8 +1490,7 @@ static void mxt_proc_t100_message(struct mxt_data *data, u8 *message)
 	input_mt_slot(input_dev, id);
 
 	if (active) {
-		dev_dbg(dev, "[%u] type:%u x:%u y:%u a:%02X p:%02X v:%02X\n",
-			id, type, x, y, major, pressure, orientation);
+		dev_dbg(dev, "[%u] type:%d x:%04d y:%04d a:%02d p:%03d v:%02X\n", id, type, x, y, major, pressure, orientation);
 
 		input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, 1);
 		input_report_abs(input_dev, ABS_MT_POSITION_X, x);
@@ -1401,6 +1499,11 @@ static void mxt_proc_t100_message(struct mxt_data *data, u8 *message)
 		//input_report_abs(input_dev, ABS_MT_PRESSURE, pressure);
 		input_report_abs(input_dev, ABS_MT_DISTANCE, distance);
 		input_report_abs(input_dev, ABS_MT_ORIENTATION, orientation);
+
+		x_value[long_press_count] = x;
+		y_value[long_press_count] = y;
+		node_value[long_press_count] = major;
+		pv_value[long_press_count] = pressure;
 
 		if((status & 0x0F) == 0x04 && (id == 0)) //1st finger Touch Down
 		{
@@ -1417,39 +1520,110 @@ static void mxt_proc_t100_message(struct mxt_data *data, u8 *message)
 
 		if(data->long_press_sent && data->long_press_touch_id == 0xFF && ((status & 0x0F) == 0x00 || (status & 0x0F) == 0x01))
 		{
-			if(x> long_press_area_x[0] && x < long_press_area_x[1] && y > long_press_area_y[0] && y < long_press_area_y[1])
+			for (i=0; i < LONG_PRESSE_TOUCH_COUNT; i++)
 			{
-				//dev_info(dev, "[%u] type:%u x:%u y:%u a:%02X p:%02X v:%02X, major*100/256:%d, data->long_press_size:%d\n", id, type, x, y, major, pressure, orientation, major*100/256, data->long_press_size);
-				if((major*100/256) > data->long_press_size)
+				if (x_value[i] == 0 || y_value[i] == 0 || node_value[i] == 0 || pv_value[i] == 0)
 				{
-					if(x > long_press_area_x_good[0] && x < long_press_area_x_good[1] && y > long_press_area_y_good[0] && y < long_press_area_y_good[1])
-					{
+					ignore = true;
+				}
+				x_total += x_value[i];
+				y_total += y_value[i];
+				node_total += node_value[i];
+				pv_total += pv_value[i];
+				dev_dbg(dev, "[count %d] x_value = %d, y_value = %d, node_value = %d, pv_value = %d \n", i, x_value[i], y_value[i], node_value[i], pv_value[i]);
+			}
+
+			if (ignore) {
+				x_avg = 0;
+				y_avg = 0;
+				node_avg = 0;
+				pv_avg = 0;
+				ignore = false;
+				dev_info(dev, "[ignore] x_avg = %d, y_avg = %d, node_avg = %d, pv_avg = %d \n", x_avg, y_avg, node_avg, pv_avg);
+			} else {
+				x_avg = x_total / LONG_PRESSE_TOUCH_COUNT;
+				y_avg = y_total / LONG_PRESSE_TOUCH_COUNT;
+				node_avg = node_total / LONG_PRESSE_TOUCH_COUNT;
+				pv_avg = pv_total / LONG_PRESSE_TOUCH_COUNT;
+				dev_info(dev, "[avg_check] x_avg = %d, y_avg = %d, node_avg = %d, pv_avg = %d \n", x_avg, y_avg, node_avg, pv_avg);
+			}
+
+			if(x_avg> long_press_area_x[0] && x_avg < long_press_area_x[1] && y_avg > long_press_area_y[0] && y_avg < long_press_area_y[1]) {
+				if(x_avg > long_press_area_x_good_1[0] && x_avg < long_press_area_x_good_1[1]
+						&& y_avg > long_press_area_y_good_1[0] && y_avg < long_press_area_y_good_1[1] && node_avg > NODE_NUMBER_MIN_GOOD_1) {
+					long_press_type = TYPE_AREA_GOOD_1;
+					dev_info(dev, "[Good_1][DOWN][%u] type:%u x_avg = %d, y_avg = %d, node_avg = %d, pv_avg = %d \n", id, type, x_avg, y_avg, node_avg, pv_avg);
+				} else if(x_avg > long_press_area_x_good_2[0] && x_avg < long_press_area_x_good_2[1]
+						&& y_avg > long_press_area_y_good_2[0] && y_avg < long_press_area_y_good_2[1] && node_avg > NODE_NUMBER_MIN_GOOD_2 && pv_avg > PV_MIN_GOOD_2) {
+					long_press_type = TYPE_AREA_GOOD_2;
+					dev_info(dev, "[Good_2][DOWN][%u] type:%u x_avg = %d, y_avg = %d, node_avg = %d, pv_avg = %d \n", id, type, x_avg, y_avg, node_avg, pv_avg);
+				} else if(x_avg > long_press_area_x_good_3[0] && x_avg < long_press_area_x_good_3[1]
+						&& y_avg > long_press_area_y_good_3[0] && y_avg < long_press_area_y_good_3[1] && node_avg > NODE_NUMBER_MIN_GOOD_3 && pv_avg > PV_MIN_GOOD_3) {
+					long_press_type = TYPE_AREA_GOOD_3;
+					dev_info(dev, "[Good_3][DOWN][%u] type:%u x_avg = %d, y_avg = %d, node_avg = %d, pv_avg = %d \n", id, type, x_avg, y_avg, node_avg, pv_avg);
+				} else if(node_avg > NODE_NUMBER_MIN_PARTIAL && pv_avg > PV_MIN_PARTIAL) {
+					long_press_type = TYPE_AREA_PARTIAL;
+					dev_info(dev, "[Partial][DOWN][%u] type:%u x_avg = %d, y_avg = %d, node_avg = %d, pv_avg = %d,\n", id, type, x_avg, y_avg, node_avg, pv_avg);
+				}
+
+				switch(long_press_type) {
+					case TYPE_AREA_GOOD_1:
+					case TYPE_AREA_GOOD_2:
+					case TYPE_AREA_GOOD_3:
 						data->long_press_touch_id = id;
 						input_report_key(data->input_dev, UDFP_LONG_PRESSED_DOWN, 1);
 						input_sync(data->input_dev);
 						input_report_key(data->input_dev, UDFP_LONG_PRESSED_DOWN, 0);
 						input_sync(data->input_dev);
-						dev_info(dev, "[Good][DOWN][%u] type:%u x:%u y:%u a:%02X p:%02X v:%02X, major*100/256:%d, data->long_press_size:%d\n", id, type, x, y, major, pressure, orientation, major*100/256, data->long_press_size);
-					}
-					else
-					{
+						//long_press_trigger_save_file(x_avg, y_avg, node_avg, pv_avg, 1);
+						break;
+					case TYPE_AREA_PARTIAL:
 						data->long_press_touch_id = id;
 						input_report_key(data->input_dev, UDFP_LONG_PRESSED_PARTIAL_DOWN, 1);
 						input_sync(data->input_dev);
 						input_report_key(data->input_dev, UDFP_LONG_PRESSED_PARTIAL_DOWN, 0);
 						input_sync(data->input_dev);
-						dev_info(dev, "[Partial][DOWN][%u] type:%u x:%u y:%u a:%02X p:%02X v:%02X, major*100/256:%d, data->long_press_size:%d\n", id, type, x, y, major, pressure, orientation, major*100/256, data->long_press_size);
-					}
+						//long_press_trigger_save_file(x_avg, y_avg, node_avg, pv_avg, 2);
+						break;
+					default:
+						break;
 				}
+
+				for (i=0; i < LONG_PRESSE_TOUCH_COUNT; i++)
+				{
+					x_value[i] = 0;
+					y_value[i] = 0;
+					node_value[i] = 0;
+					pv_value[i] = 0;
+				}
+			 }
+
+			dev_info(dev, "[%u] type:%u x:%u y:%u a:%02d p:%02d v:%02d, major*100/256:%d, data->long_press_size:%d\n", id, type, x, y, major, pressure, orientation, major*100/256, data->long_press_size);
+		} else if(!data->long_press_sent && data->long_press_touch_id == 0xFF && ((status & 0x0F) == 0x00 || (status & 0x0F) == 0x01)) {
+			if(x > 500 && x < 900 && y > 1700 && y < 2200) {
+				//long_press_trigger_save_file(x, y, major, pressure, 0);
 			}
+		}
+
+		long_press_count ++;
+		if(long_press_count >= LONG_PRESSE_TOUCH_COUNT) {
+			long_press_count = 0;
 		}
 
 	} else {
 		dev_dbg(dev, "[%u] release\n", id);
+		for (i=0; i < LONG_PRESSE_TOUCH_COUNT; i++)
+		{
+			x_value[i] = 0;
+			y_value[i] = 0;
+			node_value[i] = 0;
+			pv_value[i] = 0;
+		}
+
 		//long_press up event
 		if(data->long_press_sent == true && id == data->long_press_touch_id)
 		{
-			if(x > long_press_area_x_good[0] && x < long_press_area_x_good[1] && y > long_press_area_y_good[0] && y < long_press_area_y_good[1])
+			if(x > long_press_area_x_good_3[0] && x < long_press_area_x_good_3[1] && y > long_press_area_y_good_3[0] && y < long_press_area_y_good_3[1])
 			{
 				input_report_key(data->input_dev, UDFP_LONG_PRESSED_UP, 1);
 				input_sync(data->input_dev);
@@ -1553,8 +1727,8 @@ static void mxt_proc_t81_messages(struct mxt_data *data, u8 *msg)
 		//Device suspend, send long press down directly.
 		if(!data->suspended && data->long_press_sent != true)
 		{
-			data->long_press_sent = true;
 			dev_info(dev, "Set long_press_sent true.\n");
+			data->long_press_sent = true;
 		}
 		else
 		{
@@ -2377,6 +2551,7 @@ static void mxt_free_object_table(struct mxt_data *data)
 	data->T80_address = 0;
 	data->T81_reportid = 0;
 	data->T81_address = 0;
+	data->T136_address = 0;
 	data->T92_reportid = 0;
 	data->T92_address = 0;
 	data->T93_reportid = 0;
@@ -2482,6 +2657,8 @@ static int mxt_parse_object_table(struct mxt_data *data,
 		case MXT_UNLOCK_GESTURE_T81:
 			data->T81_reportid = min_id;
 			data->T81_address = object->start_address;
+		case MXT_MOISTURE_SUPPRESSION_T136:
+			data->T136_address = object->start_address;
 		case MXT_PROCI_SYMBOLGESTUREPROCESSOR:
 			data->T92_reportid = min_id;
 			data->T92_address = object->start_address;
@@ -3186,6 +3363,51 @@ static int mxt_t81_configuration(struct mxt_data *data, u16 cmd_offset, u8 statu
 	return 0;
 }
 
+static int mxt_t81_configuration_area(struct mxt_data *data, u16 cmd_offset)
+{
+	u16 reg;
+	int ret;
+
+	reg = data->T81_address + cmd_offset;
+	ret = __mxt_write_reg(data->client, reg, sizeof(T81_good_area), T81_good_area);
+
+	if (ret)
+	{
+		dev_err(&data->client->dev, "Write T81 config fail, error = %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int mxt_t136_configuration(struct mxt_data *data, u16 cmd_offset, u8 status)
+{
+	u16 reg;
+	u8 command_register;
+	int ret;
+
+	reg = data->T136_address + cmd_offset;
+	ret = __mxt_read_reg(data->client, reg, 1, &command_register);
+
+	if (ret)
+	{
+		dev_err(&data->client->dev, "Read T136 config fail, error = %d\n", ret);
+		return ret;
+	}
+
+	command_register = status;
+
+	ret = mxt_write_reg(data->client, reg, command_register);
+
+	if (ret)
+	{
+		dev_err(&data->client->dev, "Write T136 config fail, error = %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
 //SW-PROD-DH-TP_SUSPEND-RESUME-00+]
 #if 0
 static int mxt_t100_configuration(struct mxt_data *data, u16 cmd_offset, u8 status)
@@ -3372,6 +3594,8 @@ static int mxt_initialize(struct mxt_data *data)
 		if (error)
 			goto err_free_object_table;
 	}
+
+	mxt_t81_configuration_area(data, MXT_T81_GOOD_AREA_OFFSET);
 	dev_info(&client->dev, "%s -\n", __func__);
 
 	return 0;
@@ -3456,6 +3680,7 @@ static int mxt_set_t72_enable(struct mxt_data *data, u8 enable)
 }
 
 //Palm Supression+[
+#if 0
 static int mxt_set_t42_enable(struct mxt_data *data, u8 enable)
 {
 	struct device *dev = &data->client->dev;
@@ -3472,6 +3697,7 @@ static int mxt_set_t42_enable(struct mxt_data *data, u8 enable)
 
 	return 0;
 }
+#endif
 //Palm Supression+]
 
 
@@ -4202,6 +4428,7 @@ static int mxt_start(struct mxt_data *data)
 static int mxt_stop(struct mxt_data *data)
 {
 	int ret;
+	int i;
 	struct i2c_client *client = data->client;
 
 	dev_info(&client->dev, "%s +, suspend mode = %d, double_tap_enable = %d, FP_enable = %d\n",__func__, data->pdata->suspend_mode, data->double_tap_enable, data->FP_enable);
@@ -4256,6 +4483,15 @@ static int mxt_stop(struct mxt_data *data)
 		mxt_set_t100_multitouchscreen_cfg(data, 0, (MXT_T100_CTRL_ENABLE | MXT_T100_CTRL_DISSCRMSG | MXT_T100_CTRL_SCANEN));
 		mxt_reset_slots(data);
 		data->long_press_sent = false;
+
+		for (i=0; i < LONG_PRESSE_TOUCH_COUNT; i++)
+		{
+			x_value[i] = 0;
+			y_value[i] = 0;
+			node_value[i] = 0;
+			pv_value[i] = 0;
+		}
+
 		data->long_press_touch_id = 0xFF;
 		//SW-PROD-DH-TP_DOUBLE_TAP-00+[
 		if(data->double_tap_enable == 1 || data->FP_enable == 1)
@@ -4905,11 +5141,18 @@ static int touch_long_press_write(unsigned int enable)
 	dev_info(&g_data->client->dev, "%s, Set long_press enable = %d\n", __func__, enable);
 	g_data->T81_enable = enable;
 	//Disable palm supression when long press enable.
+#if 0
 	mxt_set_t42_enable(g_data, !enable);
-	if(enable)
+#endif
+	if(enable) {
 		mxt_t81_configuration(g_data, MXT_T81_ENABLE_OFFSET, MXT_T81_CTRL_PRESSREQ |MXT_T81_CTRL_RPTEN |MXT_T81_CTRL_ENABLE);
-	else
+		mxt_t136_configuration(g_data, MXT_T136_ENABLE_OFFSET, 0x0A);
+		dev_info(&g_data->client->dev, "%s, MXT_T136_VALUE = 0x0A\n", __func__);
+	} else {
 		mxt_t81_configuration(g_data, MXT_T81_ENABLE_OFFSET, MXT_T81_CTRL_PRESSREQ |MXT_T81_CTRL_ENABLE);
+		mxt_t136_configuration(g_data, MXT_T136_ENABLE_OFFSET, 0x02);
+		dev_info(&g_data->client->dev, "%s, MXT_T136_VALUE = 0x02\n", __func__);
+    }
 	return 0;
 }
 

@@ -72,6 +72,13 @@ config FIH_KEY
 	help
 	  support fih key logging
 
+config FIH_DLD
+	bool "fih dld"
+	depends on FIH
+	default n
+	help
+	  support enable host ramdump by cmdline
+
 config FIH_SUSPEND_RESUME_LOG
 	bool "FIH LOG about suspend/resume"
 	depends on FIH
@@ -92,4 +99,5 @@ config FIH_RPMH_MASTER_STATS
 	default n
 	help
 	  Show rpmh master stats when device resume from suspend.
+
 endmenu

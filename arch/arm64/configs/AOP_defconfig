@@ -716,6 +716,7 @@ CONFIG_FIH_TOUCH=y
 CONFIG_FIH_MFR=y
 CONFIG_FIH_BATTERY=y
 CONFIG_FIH_KEY=y
+CONFIG_FIH_DLD=y
 # FIH: support fih drivers }
 
 # FIH: support pstore {
