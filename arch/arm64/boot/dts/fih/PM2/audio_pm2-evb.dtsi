@@ -1,0 +1,113 @@
+&qupv3_se8_spi {
+	status = "ok";
+};
+
+&snd_934x {
+	fih,nxp-tfa9892-pm2;
+	qcom,audio-routing =
+		"AIF4 VI", "MCLK",
+		"RX_BIAS", "MCLK",
+		"MADINPUT", "MCLK",
+		"Lineout_1 amp", "LINEOUT1",
+		"DMIC1", "MIC BIAS1",
+		"MIC BIAS1", "Digital Mic1",
+		"DMIC3", "MIC BIAS3",
+		"MIC BIAS3", "Digital Mic3",
+		"DMIC5", "MIC BIAS4",
+		"MIC BIAS4", "Digital Mic5";
+
+	fih,hac-amp-en-gpio = <&hac_amp_en_gpio>;	/* HAC enable gpio */
+
+	pinctrl-names = "quat-mi2s-active", "quat-mi2s-sleep", "quat-tdm-active", "quat-tdm-sleep";
+	pinctrl-0 = <&sdm845_gpio58_active &sdm845_gpio59_active &sdm845_gpio60_active &sdm845_gpio61_active>;
+	pinctrl-1 = <&sdm845_gpio58_sleep &sdm845_gpio59_sleep &sdm845_gpio60_sleep &sdm845_gpio61_sleep>;
+	pinctrl-2 = <&sdm845_gpio58_active &sdm845_gpio59_active &sdm845_gpio60_active &sdm845_gpio61_active>;
+	pinctrl-3 = <&sdm845_gpio58_sleep &sdm845_gpio59_sleep &sdm845_gpio60_sleep &sdm845_gpio61_sleep>;
+
+	/* no use */
+	/delete-property/ qcom,msm-mbhc-hphl-swh;
+	/delete-property/ qcom,msm-mbhc-gnd-swh;
+	/delete-property/ qcom,msm-mbhc-hs-mic-max-threshold-mv;
+	/delete-property/ qcom,msm-mbhc-hs-mic-min-threshold-mv;
+	/delete-property/ qcom,usbc-analog-en1-gpio;
+	/delete-property/ qcom,usbc-analog-en2-gpio;
+
+	/delete-property/ qcom,hph-en0-gpio;
+	/delete-property/ qcom,hph-en1-gpio;
+
+	/delete-property/ qcom,wsa-max-devs;
+	/delete-property/ qcom,wsa-devs;
+	/delete-property/ qcom,wsa-aux-dev-prefix;
+};
+
+/* HAC */
+&soc {
+	hac_amp_en_gpio: msm_cdc_pinctrl@77 {
+		compatible = "qcom,msm-cdc-pinctrl";
+		pinctrl-names = "aud_active", "aud_sleep";
+		pinctrl-0 = <&sdm845_gpio77_active>;
+		pinctrl-1 = <&sdm845_gpio77_sleep>;
+	};
+};
+
+/* NXP TFA9892 SmartAmp I2C */
+&qupv3_se5_i2c {
+	status = "okay";
+	nxp_tfa9892_amp@35 {
+		compatible = "nxp,tfa98xx";
+		reg = <0x35>;
+	};
+};
+
+/* NXP TFA9892 SmartAmp I2S */
+&dai_mi2s3 {
+	qcom,msm-dai-q6-mi2s-dev-id = <3>;
+	qcom,msm-mi2s-rx-lines = <1>;
+	qcom,msm-mi2s-tx-lines = <2>;
+};
+
+/* no use */
+&wcd_usbc_analog_en1_gpio {
+	status = "disabled";
+};
+&wcd {
+	status = "disabled";
+};
+&wcd934x_cdc {
+	swr_master {
+		status = "disabled";
+	};
+};
+
+/* gpio */
+&tlmm {
+	sdm845_gpio77 { /* HAC_AMP_EN */
+		sdm845_gpio77_active: sdm845_gpio77_active {
+			mux {
+				pins = "gpio77";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio77";
+				drive-strength = <2>;
+				bias-disable;
+				output-high;
+			};
+		};
+
+		sdm845_gpio77_sleep: sdm845_gpio77_sleep {
+			mux {
+				pins = "gpio77";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio77";
+				drive-strength = <2>;
+				bias-disable;
+				output-low;
+			};
+		};
+	};
+};

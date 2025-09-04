@@ -2736,7 +2736,7 @@
 		};
 
 		/* SE 12 pin mappings */
-		/* add for asic uart pinctrl { */
+		/* FIH: add for asic uart pinctrl { */
 		qupv3_se12_2uart_pins: qupv3_se12_2uart_pins {
 			qupv3_se12_2uart_active: qupv3_se12_2uart_active {
 				mux {
@@ -2764,7 +2764,7 @@
 				};
 			};
 		};
-		/* add for asic uart pinctrl } */
+		/* FIH: add for asic uart pinctrl } */
 
 		qupv3_se12_i2c_pins: qupv3_se12_i2c_pins {
 			qupv3_se12_i2c_active: qupv3_se12_i2c_active {

@@ -1,0 +1,110 @@
+/* Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+#include "dsi-nt35597-dsc-wqxga-cmd.dtsi"
+#include <dt-bindings/clock/mdss-10nm-pll-clk.h>
+
+&soc {
+	dsi_nt35597_dsc_wqxga_cmd_display: qcom,dsi-display@17 {
+		compatible = "qcom,dsi-display";
+		label = "dsi_nt35597_dsc_wqxga_cmd_display";
+		qcom,display-type = "primary";
+
+		qcom,dsi-ctrl = <&mdss_dsi0>;
+		qcom,dsi-phy = <&mdss_dsi_phy0>;
+		clocks = <&mdss_dsi0_pll BYTECLK_MUX_0_CLK>,
+			<&mdss_dsi0_pll PCLK_MUX_0_CLK>;
+		clock-names = "src_byte_clk", "src_pixel_clk";
+
+		pinctrl-names = "panel_active", "panel_suspend";
+		pinctrl-0 = <&sde_dsi_no_mode_active &sde_te_active>;
+		pinctrl-1 = <&sde_dsi_no_mode_suspend &sde_te_suspend>;
+		qcom,platform-te-gpio = <&tlmm 10 0>;
+		qcom,platform-reset-gpio = <&tlmm 6 0>;
+		qcom,panel-mode-gpio = <>;
+
+		qcom,dsi-panel = <&dsi_nt35597_dsc_cmd>;
+		vddio-supply = <&pm8998_l14>;
+		lab-supply = <&lab_regulator>;
+		ibb-supply = <&ibb_regulator>;
+	};
+};
+
+&tlmm {
+	pmx_sde_no_mode {
+		sde_dsi_no_mode_active: sde_dsi_no_mode_active {
+			mux {
+				pins = "gpio6";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio6";
+				drive-strength = <8>;   /* 8 mA */
+				bias-disable = <0>;   /* no pull */
+			};
+		};
+		sde_dsi_no_mode_suspend: sde_dsi_no_mode_suspend {
+			mux {
+				pins = "gpio6";
+				function = "gpio";
+			};
+
+			config {
+				pins = "gpio6";
+				drive-strength = <2>;   /* 2 mA */
+				bias-pull-down;         /* PULL DOWN */
+			};
+		};
+	};
+};
+
+&dsi_nt35597_dsc_cmd {
+	qcom,ulps-enabled;
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
+	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
+	qcom,mdss-dsi-bl-min-level = <1>;
+	qcom,mdss-dsi-bl-max-level = <4095>;
+	qcom,platform-reset-gpio = <&tlmm 6 0>;
+	qcom,platform-te-gpio = <&tlmm 10 0>;
+	qcom,mdss-dsi-t-clk-post = <0x06>;
+	qcom,mdss-dsi-t-clk-pre = <0x1f>;
+	qcom,mdss-dsi-display-timings {
+		timing@0{
+			qcom,mdss-dsi-panel-phy-timings = [00 17 06 05 21 20 06 06 04 03 04 00];
+			qcom,display-topology = <2 2 1>;
+			qcom,default-topology-index = <0>;
+		};
+	};
+};
+
+&dsi_nt35597_truly_dsc_cmd_display {
+/delete-property/qcom,dsi-display-active;
+};
+
+&dsi_nt35597_dsc_wqxga_cmd_display {
+	qcom,dsi-display-active;
+};
+
+&pmi8998_wled {
+	qcom,led-strings-list = [00 01];
+};
+
+&dsi_sim_vid {
+	qcom,mdss-dsi-bl-pmic-control-type="bl_ctrl_dcs";
+	qcom,mdss-dsi-display-timings{
+		timing@0{
+			qcom,mdss-dsi-panel-width = <1440>;
+			qcom,mdss-dsi-panel-height = <2560>;
+		};
+	};
+};
+

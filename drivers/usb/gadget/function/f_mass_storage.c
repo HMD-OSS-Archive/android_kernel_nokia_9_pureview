@@ -224,6 +224,11 @@
 
 #include "configfs.h"
 
+/* Porting fih scsi command */
+#if defined CONFIG_FIH_USB && CONFIG_FIH_USB
+#include <linux/reboot.h>
+#endif
+/* end Porting fih scsi command */
 
 /*------------------------------------------------------------------------*/
 
@@ -577,6 +582,52 @@ static int fsg_setup(struct usb_function *f,
 
 
 /*-------------------------------------------------------------------------*/
+
+/* Porting fih scsi command */
+/*FIHTDC add for SCSI {*/
+#if defined CONFIG_FIH_USB && CONFIG_FIH_USB
+/*FIHTDC add for SCSI {*/
+#include <fih/fih_usb.h>
+static int (*fih_tool_func_ptr)(int, void*);
+
+int fih_tool_register_func(int (*callback)(int, void*))
+{
+	fih_tool_func_ptr = callback;
+	return 0;
+}
+EXPORT_SYMBOL(fih_tool_register_func);
+
+void fih_tool_unregister_func(void (*callback)(int, void*))
+{
+	fih_tool_func_ptr = NULL;
+}
+EXPORT_SYMBOL(fih_tool_unregister_func);
+
+static int fih_tool_func(int command, void *data)
+{
+	if (fih_tool_func_ptr) {
+		if(command >= CHECK_COMMAND && command <= EXE_COMMAND) {
+			struct fsg_common *input_data;
+			struct fih_usb_data input;
+			input_data = (struct fsg_common *)data;
+			input.cmnd = input_data->cmnd;
+			input.bh_buf = input_data->next_buffhd_to_fill->buf;
+			input.data_size_from_cmnd = &input_data->data_size_from_cmnd;
+			return (*fih_tool_func_ptr) (command, &input);
+		} else if(command == CHECK_STATUS) {
+			int *input;
+			input = (int *)data;
+			return (*fih_tool_func_ptr) (command, input);
+		} else {
+			return 0;
+		}
+	} else {
+		return 0;
+	}
+}
+#endif
+/*FIHTDC add for SCSI }*/
+/* end Porting fih scsi command */
 
 /* All the following routines run in process context */
 
@@ -1240,6 +1291,12 @@ static int do_read_toc(struct fsg_common *common, struct fsg_buffhd *bh)
 	int		msf = common->cmnd[1] & 0x02;
 	int		start_track = common->cmnd[6];
 	u8		*buf = (u8 *)bh->buf;
+/* Porting fih scsi command */
+#ifdef READ_TOC_SUPPORT_MAC_OS
+		u8		format;
+		int 	ret;
+#endif
+/* end Porting fih scsi command */
 
 	if ((common->cmnd[1] & ~0x02) != 0 ||	/* Mask away MSF */
 			start_track > 1) {
@@ -1247,6 +1304,9 @@ static int do_read_toc(struct fsg_common *common, struct fsg_buffhd *bh)
 		return -EINVAL;
 	}
 
+/* Porting fih scsi command */
+#ifndef READ_TOC_SUPPORT_MAC_OS
+/* end Porting fih scsi command */
 	memset(buf, 0, 20);
 	buf[1] = (20-2);		/* TOC data length */
 	buf[2] = 1;			/* First track number */
@@ -1259,6 +1319,29 @@ static int do_read_toc(struct fsg_common *common, struct fsg_buffhd *bh)
 	buf[14] = 0xAA;			/* Lead-out track number */
 	store_cdrom_address(&buf[16], msf, curlun->num_sectors);
 	return 20;
+/* Porting fih scsi command */
+#else
+	/*
+	* Check if CDB is old style SFF-8020i
+	* i.e. format is in 2 MSBs of byte 9
+	* Mac OS-X host sends us this.
+       *
+	*			cmnd[9] cmnd[2]
+	*	Win 	0x00	0x0
+	*	Mac 	0x80	0x0
+	*/
+    format = (common->cmnd[9] >> 6) & 0x3;
+	if (format == 0)
+		format = common->cmnd[2] & 0xf; /* new style MMC-2 */
+
+	ret = fsg_get_toc(curlun, msf, format, buf);
+	if (ret < 0) {
+		curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
+		return -EINVAL;
+	}
+	return ret;
+#endif
+/* end Porting fih scsi command */
 }
 
 static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
@@ -1805,8 +1888,20 @@ static int check_command(struct fsg_common *common, int cmnd_size,
 		 */
 		if (common->cmnd[0] != INQUIRY &&
 		    common->cmnd[0] != REQUEST_SENSE) {
+/* Porting fih scsi command */
+/*FIHTDC modify for SCSI {*/
+#if defined CONFIG_FIH_USB && CONFIG_FIH_USB
+			if (!fih_tool_func(CHECK_COMMAND, common)) {
 			DBG(common, "unsupported LUN %u\n", common->lun);
 			return -EINVAL;
+		}
+#else
+/* end Porting fih scsi command */
+			DBG(common, "unsupported LUN %u\n", common->lun);
+			return -EINVAL;
+/* Porting fih scsi command */
+#endif
+/* end Porting fih scsi command */
 		}
 	}
 
@@ -1814,13 +1909,45 @@ static int check_command(struct fsg_common *common, int cmnd_size,
 	 * If a unit attention condition exists, only INQUIRY and
 	 * REQUEST SENSE commands are allowed; anything else must fail.
 	 */
-	if (curlun && curlun->unit_attention_data != SS_NO_SENSE &&
+	if ((curlun && curlun->unit_attention_data != SS_NO_SENSE &&
 	    common->cmnd[0] != INQUIRY &&
-	    common->cmnd[0] != REQUEST_SENSE) {
+	    common->cmnd[0] != REQUEST_SENSE)
+/* Porting fih scsi command */
+/*FIHTDC modify for SCSI {*/
+#if defined CONFIG_FIH_USB && CONFIG_FIH_USB
+		&&!fih_tool_func(CHECK_COMMAND, common)
+#endif
+/*FIHTDC modify for SCSI }*/
+/* end Porting fih scsi command */
+	    ){
 		curlun->sense_data = curlun->unit_attention_data;
 		curlun->unit_attention_data = SS_NO_SENSE;
 		return -EINVAL;
 	}
+
+/* Porting fih scsi command */
+/*FIHTDC modify for SCSI {*/
+#if defined CONFIG_FIH_USB && CONFIG_FIH_USB
+		if (!fih_tool_func(CHECK_COMMAND, common)) {
+			/* Check that only command bytes listed in the mask are non-zero */
+			common->cmnd[1] &= 0x1f;			/* Mask away the LUN */
+			for (i = 1; i < cmnd_size; ++i) {
+				if (common->cmnd[i] && !(mask & (1 << i))) {
+					if (curlun)
+						curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
+					return -EINVAL;
+				}
+			}
+
+			/* If the medium isn't mounted and the command needs to access
+			 * it, return an error. */
+			if (curlun && !fsg_lun_is_open(curlun) && needs_medium) {
+				curlun->sense_data = SS_MEDIUM_NOT_PRESENT;
+				return -EINVAL;
+			}
+		}
+#else
+/* end Porting fih scsi command */
 
 	/* Check that only command bytes listed in the mask are non-zero */
 	common->cmnd[1] &= 0x1f;			/* Mask away the LUN */
@@ -1838,6 +1965,11 @@ static int check_command(struct fsg_common *common, int cmnd_size,
 		curlun->sense_data = SS_MEDIUM_NOT_PRESENT;
 		return -EINVAL;
 	}
+
+/* Porting fih scsi command */
+#endif
+/*FIHTDC modify for SCSI }*/
+/* end Porting fih scsi command */
 
 	return 0;
 }
@@ -1993,7 +2125,13 @@ static int do_scsi_command(struct fsg_common *common)
 		common->data_size_from_cmnd =
 			get_unaligned_be16(&common->cmnd[7]);
 		reply = check_command(common, 10, DATA_DIR_TO_HOST,
+/* Porting fih scsi command */
+#ifdef READ_TOC_SUPPORT_MAC_OS
+				      (0xf<<6) | (1<<1), 1,
+#else
 				      (7<<6) | (1<<1), 1,
+#endif
+/* end Porting fih scsi command */
 				      "READ TOC");
 		if (reply == 0)
 			reply = do_read_toc(common, bh);
@@ -2102,6 +2240,14 @@ static int do_scsi_command(struct fsg_common *common)
 		/* Fall through */
 
 	default:
+/* Porting fih scsi command */
+/*FIHTDC add for SCSI {*/
+#if defined CONFIG_FIH_USB && CONFIG_FIH_USB
+		if (fih_tool_func(EXE_COMMAND_CHECK, common)) {
+			reply = fih_tool_func(EXE_COMMAND, common);
+} else {
+#endif
+/* end Porting fih scsi command */
 unknown_cmnd:
 		common->data_size_from_cmnd = 0;
 		sprintf(unknown, "Unknown x%02x", common->cmnd[0]);
@@ -2112,7 +2258,12 @@ unknown_cmnd:
 			reply = -EINVAL;
 		}
 		break;
+/* Porting fih scsi command */
+#if defined CONFIG_FIH_USB && CONFIG_FIH_USB
 	}
+#endif
+/* end Porting fih scsi command */
+	}//switch (common->cmnd[0])
 	up_read(&common->filesem);
 
 	if (reply == -EINTR || signal_pending(current))
@@ -2609,6 +2760,25 @@ static int fsg_main_thread(void *common_)
 		if (send_status(common))
 			continue;
 
+/* Porting fih scsi command */
+/*FIHTDC modify for SCSI {*/
+#if defined CONFIG_FIH_USB && CONFIG_FIH_USB
+		{
+			int check_flag;
+			check_flag = CHECK_STATUS_MODE_SWITCH_REBOOT_FLAG;
+			if (fih_tool_func(CHECK_STATUS, &check_flag)) {
+				kernel_restart("ftm");
+			}
+
+			check_flag = CHECK_STATUS_REBOOT_FLAG;
+			if (fih_tool_func(CHECK_STATUS, &check_flag)) {
+				kernel_restart("");
+			}
+		}
+#endif
+/*FIHTDC modify for SCSI {*/
+/* end Porting fih scsi command */
+
 		spin_lock_irq(&common->lock);
 		if (!exception_in_progress(common))
 			common->state = FSG_STATE_IDLE;
@@ -2712,6 +2882,18 @@ void fsg_common_put(struct fsg_common *common)
 	kref_put(&common->ref, fsg_common_release);
 }
 EXPORT_SYMBOL_GPL(fsg_common_put);
+
+/* check if fsg_num_buffers is within a valid range */
+static inline int fsg_num_buffers_validate(unsigned int fsg_num_buffers)
+{
+#define FSG_MAX_NUM_BUFFERS	32
+
+	if (fsg_num_buffers >= 2 && fsg_num_buffers <= FSG_MAX_NUM_BUFFERS)
+		return 0;
+	pr_err("fsg_num_buffers %u is out of range (%d to %d)\n",
+	       fsg_num_buffers, 2, FSG_MAX_NUM_BUFFERS);
+	return -EINVAL;
+}
 
 static struct fsg_common *fsg_common_setup(struct fsg_common *common)
 {

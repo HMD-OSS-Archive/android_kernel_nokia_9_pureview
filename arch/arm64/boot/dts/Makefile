@@ -25,6 +25,10 @@ ifeq ($(CONFIG_FIH_AOP),y)
 dts-dirs += fih/AOP
 endif
 
+ifeq ($(CONFIG_FIH_PM2),y)
+dts-dirs += fih/PM2
+endif
+
 subdir-y	:= $(dts-dirs)
 
 dtstree		:= $(srctree)/$(src)

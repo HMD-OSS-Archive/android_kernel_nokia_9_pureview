@@ -1,0 +1,11 @@
+&soc {
+	fih_info {
+		compatible = "fih_info";
+		status = "ok";
+		fih-info,devmodel = "PM2";
+		fih-info,baseband = "1.1P";
+		fih-info,bandinfo = "G_850_900_1800_1900^W_1_2_3_4_5_8^C_0_1_10^L_1_2_3_4_5_7_8_12_13_17_18_19_20_25_26_28_29_30_32_38_41_46_66_71";
+		fih-info,hwmodel  = "PM2";
+		fih-info,simslot  = "2";
+	};
+};

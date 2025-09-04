@@ -457,7 +457,7 @@
 		status = "disabled";
 	};
 
-	/* add for asic uart pinctrl { */
+	/* FIH: add for asic uart pinctrl { */
 	qupv3_se12_2uart: qcom,qup_uart@0xa90000 {
 		compatible = "qcom,msm-geni-serial-hs", "qcom,msm-geni-uart";
 		reg = <0xa90000 0x4000>;
@@ -475,7 +475,7 @@
 		qcom,wrapper-core = <&qupv3_1>;
 		status = "disabled";
 	};
-	/* add for asic uart pinctrl } */
+	/* FIH: add for asic uart pinctrl } */
 
 	/* I2C */
 	qupv3_se8_i2c: i2c@a80000 {

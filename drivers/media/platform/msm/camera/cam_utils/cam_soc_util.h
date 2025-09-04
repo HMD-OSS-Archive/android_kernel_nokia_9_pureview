@@ -208,7 +208,7 @@ struct cam_hw_soc_info {
 	bool                            clk_control_enable;
 
 	void                           *soc_private;
-	/* add LIGHT asic check*/
+	/* ---JT---, add LIGHT asic check*/
 	uint32_t	                   asic_supported;
 	int                            asic_uart_line;
 	int32_t                        asic_sync_obj;
